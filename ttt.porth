@@ -1,0 +1,113 @@
+include "std.porth"
+
+const INPUT_SIZE 2 end
+memory board 9 end
+memory player_chars 3 end
+memory board_str sizeof(Str) end
+memory input_ptr INPUT_SIZE end
+
+1 // start player num
+'X' player_chars 1 + !8
+'O' player_chars 2 + !8
+"123\n456\n789\n" board_str !Str
+proc clear
+    "\033[1;1H\033[2J" puts
+end
+
+proc getInput
+    clear
+    board_str @Str puts 
+    "\nPlayer " puts
+    dup player_chars + 1 swap puts
+    ": Choose a number\n" puts
+    INPUT_SIZE input_ptr stdin read
+end
+
+proc updateCell
+    over over board + !8
+    swap player_chars + @8
+    swap
+    dup 3 div + board_str @Str.data + !8
+end
+
+proc win
+    clear
+    board_str @Str puts
+    "\nPlayer " puts 
+    rot dup player_chars + 1 swap puts
+    " won!\n" puts
+    0 exit
+end
+
+proc checkWin
+    over dup dup * * 
+    
+    dup
+    board 0 + @8
+    board 1 + @8
+    board 2 + @8
+    * * = if win end
+    dup
+    board 3 + @8
+    board 4 + @8
+    board 5 + @8
+    * * = if win end
+    dup
+    board 6 + @8
+    board 7 + @8
+    board 8 + @8
+    * * = if win end
+    dup
+    board 0 + @8
+    board 3 + @8
+    board 6 + @8
+    * * = if win end
+    dup
+    board 1 + @8
+    board 4 + @8
+    board 7 + @8
+    * * = if win end
+    dup
+    board 2 + @8
+    board 6 + @8
+    board 8 + @8
+    * * = if win end
+    dup
+    board 0 + @8
+    board 4 + @8
+    board 8 + @8
+    * * = if win end
+    dup
+    board 2 + @8
+    board 4 + @8
+    board 6 + @8
+    * * = if win end
+    drop
+end
+
+proc isValidEntry
+    dup
+    dup  '1' >=
+    swap '9' <=
+    and
+    swap '1' - board + @8 0 =
+    and
+end
+
+proc update
+    input_ptr @8
+    dup isValidEntry if
+        over over
+        '1' -
+        updateCell
+        checkWin 
+        swap 2 mod 1 + swap
+    end
+    drop
+end
+
+// Main Loop
+while getInput 0 >= do
+    update
+end
+drop
