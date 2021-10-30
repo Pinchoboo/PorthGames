@@ -1,3 +1,3 @@
 # Games
 1. TickTackToe
-2. 4 in a row (in progress)
+2. animated 4 in a row
