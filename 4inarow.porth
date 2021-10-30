@@ -1,0 +1,245 @@
+include "std.porth" 
+
+const INPUT_SIZE 2 end
+const COLS 9 end
+const ROWS 7 end
+memory delta_time sizeof(timespec) end
+memory board COLS ROWS * end
+memory tile_chars 4 end
+memory input_ptr INPUT_SIZE end
+memory currentX 1 end
+memory currentY 1 end
+memory checkX 1 end
+memory checkY 1 end
+memory xDir 8 end
+memory yDir 8 end
+
+10 currentX !8 // initialize out of bounds such that player NULL does not instantly win 
+
+proc init
+    //load character table
+    '.' tile_chars 0 + !8
+    'X' tile_chars 1 + !8
+    'O' tile_chars 2 + !8
+    '#' tile_chars 3 + !8
+
+    //add walls in board
+    0 while dup ROWS < do
+        0 while dup COLS < do
+            over ROWS 1 - = over dup COLS 1 - = swap 0 = or or if
+                over COLS * over + 
+                board + 3 swap !8
+            end   
+            1 +
+        end drop
+        1 +
+    end drop
+end 
+
+proc draw
+    "\033[1;1H\033[2J" puts // clear screen
+    
+    0 while dup COLS < do   // print possible options by checking the top row of the board
+        dup board + @8 0 = if
+            dup putu
+        else
+            " " puts
+        end
+        1 +
+    end drop
+
+    "\n" puts 
+
+    0 while dup ROWS < do // draw the board
+        0 while dup COLS < do
+            over COLS * over + board + @8
+            tile_chars + 1 swap puts
+            1 +
+        end drop
+        "\n" puts    
+        1 +
+    end
+    drop 
+end
+
+proc getInput
+    "Player " puts
+    over tile_chars + 1 swap puts
+    " choose a number\n" puts
+    INPUT_SIZE input_ptr stdin read drop
+    input_ptr @8
+end
+
+proc isValidEntry // returns pushes true if input corresponds to a valid move
+    dup
+    dup  '1' >=
+    swap '9' <=
+    and
+    swap
+    '0' - 
+    board + @8 0 =
+    and
+end
+
+proc updateCell  // places a new piece on the board
+    over currentX !8
+    0 currentY !8
+    over over swap board + !8
+end
+
+proc updateFallingCell // simulate falling of last placed piece
+    currentY @8 COLS * currentX @8 +
+    board +
+
+    dup COLS + @8 0 = if // if below the cell below the piece is empty move it there
+        dup @8 
+        over 0 swap !8
+        over COLS + !8
+
+        currentY @8 1 + currentY !8 
+    else //otherwise stop the animation
+        rot 
+        drop 1
+        rot rot
+    end
+    drop
+end
+
+proc win
+    "Player " puts
+    dup board + @8 tile_chars + 1 swap puts
+    " wins!\n" puts
+    0 exit    
+end
+
+proc drawScreen // screen for when the game ends in a draw
+    "It's a draw!\n" puts
+    0 exit
+end
+
+proc checkDraw
+    0 while dup COLS < do
+        dup COLS 1 - = if drawScreen end
+        dup board + @8 0 = if 
+            drop COLS 
+        else 
+            1 +
+        end
+    end drop
+end
+
+
+proc inBounds
+    over over //x y
+    dup 0 >=
+    swap ROWS < and
+    swap
+    dup 0 >=
+    swap COLS < and
+    and
+end
+
+proc tryDir // check if the piece in xDir and yDir are of the same player
+    checkX @8 xDir @64 +
+    checkY @8 yDir @64 +
+    inBounds if
+        COLS * + board + @8 over board + @8 = if
+            checkX @8 xDir @64 + checkX !8
+            checkY @8 yDir @64 + checkY !8
+            true
+        else
+            false
+        end
+    else
+        drop drop
+        false
+    end 
+    
+end
+
+proc probe // counts how far you can go in xDir and yDir while only encountering pieces of the same player
+    currentX @8 checkX !8
+    currentY @8 checkY !8
+    while tryDir do swap 1 + swap end
+end
+
+proc checkWin //probe in all directions starting from the last placed piece counting how many there are in a row, if there is 4 or more end the game
+    1
+    currentY @8 COLS * currentX @8 +
+    
+    1 xDir !64
+    -1 yDir !64
+    probe
+    
+    -1 xDir !64
+    1 yDir !64
+    probe
+    
+    swap 4 >= if win end
+    1 swap    
+    
+    1 xDir !64
+    0 yDir !64
+    probe
+    
+    -1 xDir !64
+    0 yDir !64
+    probe
+
+    swap 4 >= if win end
+    1 swap    
+    
+    1 xDir !64
+    1 yDir !64
+    probe
+    
+    -1 xDir !64
+    -1 yDir !64
+    probe
+
+    swap 4 >= if win end
+    1 swap    
+    
+    0 xDir !64
+    1 yDir !64
+    probe
+    swap 4 >= if win end
+    1 swap
+    drop drop 
+end
+
+proc main
+    init 
+    100000000 delta_time 8 + !64 // magic stolen from gol.porth
+    0 // animation done
+    1 // starting player
+    while true do
+        over 0 > if //when animation is done
+            swap drop 0 swap
+            checkWin
+            checkDraw
+            0 while dup 0 = do // while a valid action has not yet been taken
+                draw
+                getInput
+                dup isValidEntry if // add new piece to board if possible
+                    swap 1 + swap
+                    '0' - 
+                    rot
+                    updateCell
+                    rot rot
+                end
+                drop
+            end drop
+
+            2 % 1 + // change current player 1->2 and 2->1 
+        else //falling animation
+            draw
+            updateFallingCell
+            NULL delta_time 0 CLOCK_MONOTONIC clock_nanosleep drop // magic stolen from gol.porth
+        end
+    end 
+    drop
+    drop
+end
+
+main
